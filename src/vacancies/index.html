@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+	<head>
+		<link rel="stylesheet" type="text/css" href="../bower_components/bootstrap/dist/css/bootstrap.css">
+	</head>
+	<body ng-app="VacancyExampleApp">
+		
+  		<div ng-controller="ExampleController" class="container">
+										
+			<h3 class="text-muted" style="margin-bottom: 40px">Vacancy search example</h3>			  						  			
+			<div class="row">
+				<div class="col-md-4">
+					<form class="form-inline" ng-submit="search()">						
+						<input ng-model="q" type="text" class="form-control">
+						<input type="submit" style="position: absolute; left: -9999px"/>													
+					</form>															
+																				
+					<div ng-if="searchResult.aggregations.disciplines.buckets.length > 0">
+						<h3>Discipline</h3>
+						<ul class="list-unstyled" ng-repeat="bucket in searchResult.aggregations.disciplines.buckets">
+							<li><a href="#" ng-click="setDiscipline(bucket.key)">{{bucket.key}} ({{bucket.doc_count}})</a> <a href="#" ng-if="discipline != null && discipline == bucket.key" ng-click="removeDiscipline(bucket.key)"> <span class="glyphicon glyphicon-remove" aria-hidden="true"></span></a></li>
+						</ul>
+					</div>
+					
+					<div ng-if="searchResult.aggregations.educations.buckets.length > 0">
+						<h3>Education</h3>
+						<ul class="list-unstyled" ng-repeat="bucket in searchResult.aggregations.educations.buckets">
+							<li><a href="#" ng-click="setEducation(bucket.key)">{{bucket.key}} ({{bucket.doc_count}})</a> <a href="#" ng-if="education != null && education == bucket.key" ng-click="removeEducation(bucket.key)"> <span class="glyphicon glyphicon-remove" aria-hidden="true"></span></a></li>
+						</ul>
+					</div>					
+					
+				</div>
+				<div class="col-md-8">
+					<div class="row">
+						<div class="col-sm-6 col-md-4" ng-repeat="hit in searchResult.hits.hits">							
+							<div class="thumbnail">							
+							<div class="caption">
+								<h3>{{hit._source.title}}</h3>
+								<p style="font-style: italic">{{hit._source.education.join('/')}} {{hit._source.discipline}}</p>
+								<p ng-if="hit.highlight" ng-bind-html="hit.highlight.description[0] | unsafe"></p>
+								<p ng-if="!hit.highlight">{{hit._source.description | limitTo: 100}}</p>
+								<p><a href="#" class="btn btn-primary" role="button">Apply</a></p>
+							</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>									
+		</div>
+			
+		<script src="../bower_components/angular/angular.js"></script>
+  		<script src="../bower_components/elasticsearch/elasticsearch.angular.js"></script>
+		  
+		<script>
+			
+			var VacancyExampleApp = angular.module('VacancyExampleApp', ['elasticsearch']);
+			
+			VacancyExampleApp.filter('unsafe', function($sce) {return $sce.trustAsHtml; });
+			
+			VacancyExampleApp.service('client', function (esFactory) {
+			return esFactory({
+				host: 'localhost:9200'								
+			});
+			});
+			
+			VacancyExampleApp.controller('ExampleController', function ($scope, client, esFactory) {																														
+				
+				$scope.search = function(){								
+					client.search({
+						index: 'demo',
+						type: 'vacancies',
+						body:{
+							query: {
+								filtered: {
+									query: ($scope.q ? 
+									{
+										bool: {
+											should: [
+												{ match: { title: { query: $scope.q, boost: 2 } }},
+												{ match: { description: $scope.q }},
+												{ wildcard: { number: '*'+$scope.q.toLowerCase()+'*' }}
+											]
+										}
+									} : 
+									{
+										match_all : {}
+									}),
+									filter: {
+										bool: {
+											must: [
+												{
+													term: ($scope.discipline ? 
+													{
+														discipline: $scope.discipline 
+													} : 
+														undefined
+													),
+													terms: ($scope.education && $scope.education.length > 0 ? 
+													{
+														discipline: $scope.education 
+													} : 
+														undefined
+													)	
+												}
+											]
+										}
+									}
+								}
+							},
+							highlight: {
+								fields: {
+									description: {}
+								}
+							},
+							aggs:{
+								disciplines: {
+									terms: { field: 'discipline' }
+								},
+								educations: {
+									terms: { field: 'education' }
+								}															
+							}
+						}
+					}).then(function(resp){
+						$scope.searchResult = resp;
+					});	
+				}
+				
+				$scope.setDiscipline = function(discipline){
+					$scope.discipline = discipline;
+					$scope.search();
+				}
+				
+				$scope.removeDiscipline = function(discipline){
+					$scope.discipline = null;
+					$scope.search();
+				}
+				
+				$scope.setEducation = function(education){
+					
+					if($scope.education.indexOf(education) == -1)
+						return;
+					
+					$scope.education.push(education);
+					$scope.search();
+				}
+				
+				$scope.removeEducation = function(education){
+					
+					var index = $scope.education.indexOf(education);
+					if(index == -1)
+						return;
+					
+					$scope.education.splice(index, 1);
+					$scope.search();
+				}				
+				
+				$scope.search();	
+			});			
+  		</script>		
+	</body>
+</html>

@@ -58,7 +58,7 @@
 # http.port: 9200
 
  http.cors.enabled: true
- http.cors.allow-origin: /https?:\/\/localhost(:[0-9]+)?/
+ http.cors.allow-origin: /https?:\/\/summit.localhost.efocus.local(:[0-9]+)?/
   
 #
 # For more information, see the documentation at:

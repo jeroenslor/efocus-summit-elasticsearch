@@ -1,0 +1,18 @@
+{
+  "name": "eFocus Summit elasticsearch crash course",
+  "authors": [
+    "Jeroen Slor <jeroen.slor@efocus.nl>"
+  ],
+  "description": "Examples used during the eFocus Summit elasticsearch crash course",
+  "main": "index.html",  
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components"    
+  ],
+  "dependencies": {
+    "angular": "~1.4.7",
+    "elasticsearch": "~9.0.0"
+  }
+}

@@ -7,53 +7,64 @@
 		
   		<div ng-controller="MainController" class="container">
 										
-			<h2 class="text-muted" style="margin-bottom: 40px">Global search example</h2>	
+			<h2 class="text-muted" style="margin-bottom: 40px">Global search</h2>	
 			
-			<form class="form-inline" ng-submit="search()" style="margin-bottom: 40px">						
-				<input ng-model="q" type="text" class="form-control">
-				<input class="btn btn-primary" type="submit" value="search" />													
-			</form>
-			
-			<ul class="nav nav-tabs" style="margin-bottom: 20px">
-				<li role="presentation" ng-class="{active: !type}">
-					<a href="#">all ({{searchResult.hits.total}})</a>
-				</li>				
-				<li ng-repeat="bucket in searchResult.aggregations.types.buckets" role="presentation" ng-class="{ active: type === bucket.key }">
-					<a href="#">{{bucket.key}} ({{bucket.doc_count}})</a>
-				</li>
-			</ul>
-			
-			<div ng-repeat-start="hit in searchResult.hits.hits"></div>
-				
-				<!-- page -->
-				<div ng-if="hit._type === 'pages'" style="margin-bottom: 10px">					
-					<h4 class="media-heading">{{hit._source.title}}</h4>
-					<p ng-if="hit.highlight.body" ng-bind-html="hit.highlight.body[0] | unsafe"></p>
-					<p ng-if="!hit.highlight">{{hit._source.body | limitTo: 300}}</p>					
-				</div>
-				
-				<!-- news -->
-				<div class="media" ng-if="hit._type === 'news'">
-					<div class="media-left">
-						<a href="#">
-						<img class="media-object" ng-src="hit._source.img" data-holder-rendered="true" style="width: 64px; height: 64px;">
-						</a>
-					</div>
-					<div class="media-body">
-						<h4 class="media-heading">{{hit._source.title}}</h4>
-						
-						{{hit._source}}
-					</div>
-				</div>
+			<div class="row">
+				<div class="col-md-4">
+					
+					<!-- q form -->
+					<form class="form-inline" ng-submit="search()" style="margin-bottom: 20px">						
+						<input ng-model="q" type="text" class="form-control">
+						<input class="btn btn-primary" value="search" type="submit"/>													
+					</form>															
 
-				<!-- vacancy -->
-				<div ng-if="hit._type === 'vacancies'">					
-					<h4 class="media-heading">{{hit._source.title}}</h4>
-					<p ng-bind-html="hit.highlight.description[0] | unsafe | limitTo: 100"></p>
-					{{hit._source}}
+					<!-- type facet -->																	
+					<ul class="list-group">							
+						<li class="list-group-item" ng-repeat="typeBucket in searchResult.aggregations.types.buckets">
+							<a href="#" ng-click="setType(typeBucket.key)">
+								{{typeBucket.key}} ({{typeBucket.doc_count}})
+							</a> 
+							<a href="#" ng-if="type == typeBucket.key" ng-click="removeType(type)"> 
+								<span class="glyphicon glyphicon-remove" aria-hidden="true"></span>
+							</a>
+						</li>			
+					</ul>
+																
 				</div>
-											
-			<div ng-repeat-end></div>								  						  															
+				<div class="col-md-8">
+					<div class="row">
+												
+						<div ng-repeat-start="hit in searchResult.hits.hits"></div>
+				
+						<!-- page -->
+						<div ng-if="hit._type === 'pages'" style="margin-bottom: 10px">					
+							<h4 ng-bind-html="hit.highlight.title ? hit.highlight.title[0] : hit._source.title | unsafe"></h4>					
+							<p ng-bind-html="hit.highlight.body ? hit.highlight.body[0] : hit._source.body | limitTo:300 | unsafe">					
+						</div>
+						
+						<!-- news -->
+						<div class="media" ng-if="hit._type === 'news'">
+							<div class="media-left">
+								<a href="#">
+									<img class="media-object" ng-src="/images/{{hit._source.img}}" style="width: 64px; height: 64px;">
+								</a>
+							</div>
+							<div class="media-body">
+								<h4 class="media-heading" ng-bind-html="hit.highlight.title ? hit.highlight.title[0] : hit._source.title | unsafe"></h4>						
+								<p ng-bind-html="hit.highlight.body ? hit.highlight.body[0] : hit._source.body | limitTo:300 | unsafe">	
+							</div>
+						</div>
+		
+						<!-- vacancy -->
+						<div ng-if="hit._type === 'vacancies'">					
+							<h4 class="media-heading" ng-bind-html="hit.highlight.title ? hit.highlight.title[0] : hit._source.title | unsafe"></h4>
+							<p>{{hit._source.location}}</p>
+							<p ng-bind-html="hit.highlight.description ? hit.highlight.description[0] : hit._source.description | limitTo:300 | unsafe"><p/>							
+						</div>
+													
+					<div ng-repeat-end></div>
+				</div>
+			</div>																												
 		</div>
 			
 		<script src="../bower_components/angular/angular.js"></script>
@@ -68,7 +79,7 @@
 				$scope.search = function(){								
 					client.search({
 						index: 'demo',
-						type: 'pages',
+						type: ['pages','news','vacancies'],
 						body:{
 							query: {
 								filtered: {
@@ -76,8 +87,9 @@
 									{
 										bool: {
 											should: [
-												{ match: { title: { query: $scope.q, boost: 2 } }},
-												{ match: { body: $scope.q }}												
+												{ match: { title: { query: $scope.q } }},
+												{ match: { body: $scope.q }},
+												{ match: { description: $scope.q }}											
 											]
 										}
 									} : 
@@ -90,24 +102,27 @@
 												{
 													term: ($scope.type ? 
 													{
-														_type: $scope.type 
+														_type: $scope.type																												
 													} : 
 														undefined
 													)
 												}
-											]
+											]											
 										}
 									}
 								}
 							},
 							highlight: {
-								pre_tags : ["<strong>"],
-        						post_tags : ["</strong>"],
+								pre_tags : ["<mark>"],
+        						post_tags : ["</mark>"],
 								fields: {
 									title: {},
 									body: {
 										fragment_size: 300
-									},									
+									},
+									description: {
+										fragment_size: 300
+									}								
 								}
 							},
 							aggs:{
@@ -116,13 +131,13 @@
 								}									
 							}
 						}
-					}).then(function(resp){
+					}).then(function(resp){																		
 						$scope.searchResult = resp;
 					});	
 				}
 				
-				$scope.setType = function(type){
-					$scope.type = type;
+				$scope.setType = function(type){					
+					$scope.type = type;						
 					$scope.search();
 				}
 				
